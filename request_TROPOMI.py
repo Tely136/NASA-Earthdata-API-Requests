@@ -28,10 +28,10 @@ class SessionWithHeaderRedirection(requests.Session):
         return
 
 
-start_date = '2023-08-02'  # yyyy-mm-dd
+start_date = '2023-12-17'  # yyyy-mm-dd
 start_time = '00:00:00'  # hh:mm:ss
 
-end_date = '2023-08-02'
+end_date = '2023-12-30'
 end_time = '23:59:59'
 
 min_lat = '40'
@@ -40,7 +40,7 @@ max_lat = '45'
 min_lon = '-78'
 max_lon = '-70'
 
-folder = './TROPOMI_data'
+folder = 'C:/Users/Thomas Ely/OneDrive - The City College of New York/EEI9700 Data/TROPOMI Data'
 if not os.path.exists(folder):
     os.mkdir(folder)
 
