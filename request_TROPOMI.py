@@ -54,49 +54,57 @@ collection_id = 'C2089270961-GES_DISC'
 bounding_box = f'{min_lon},{min_lat},{max_lon},{max_lat}'  # Fill in with your bounding box coordinates
 time_range = f'{start_date}T{start_time}Z,{end_date}T{end_time}Z'  # Fill in with your time interval
 
-# CMR API endpoint for granule search
-cmr_search_url = f'https://cmr.earthdata.nasa.gov/search/granules.json?collection_concept_id={collection_id}&bounding_box={bounding_box}&temporal={time_range}'
+# Assuming session, folder, collection_id, bounding_box, time_range are defined
+base_url = "https://cmr.earthdata.nasa.gov/search/granules.json"
+params = {
+    'collection_concept_id': collection_id,
+    'bounding_box': bounding_box,
+    'temporal': time_range,
+    'page_size': 100,  # Adjust based on the maximum allowed or preferred size
+    'page_num': 1
+}
 
-# Make the API request
-response = requests.get(cmr_search_url)
-response.raise_for_status()  # Check for request errors
+while True:
+    # Build the search URL with current page number
+    response = requests.get(base_url, params=params)
+    response.raise_for_status()  # Check for request errors
 
-# Parse the response
-granules = response.json()['feed']['entry']
+    # Parse the response
+    granules = response.json()['feed']['entry']
 
-# Extract and print download URLs
-for granule in granules:
-    # The specifics of this part might vary depending on the dataset and response structure
-    urls = [link['href'] for link in granule['links'] if link.get('rel') == 'http://esipfed.org/ns/fedsearch/1.1/data#']
-    for url in urls:
+    if not granules:  # Exit loop if no more granules are returned
+        break
 
-        filename = url[url.rfind('/') + 1:]
-        if filename.endswith('.nc'):
-            print(filename)
+    print(f"Processing {len(granules)} granules on page {params['page_num']}")
 
-            try:
-                # submit the request using the session
-                response = session.get(url, stream=True)
-                print(response.status_code)
+    # Extract and print download URLs
+    for granule in granules:
+        urls = [link['href'] for link in granule['links'] if
+                link.get('rel') == 'http://esipfed.org/ns/fedsearch/1.1/data#']
+        for url in urls:
+            filename = url[url.rfind('/') + 1:]
+            if filename.endswith('.nc'):
+                print(filename)
+                try:
+                    # submit the request using the session
+                    response = session.get(url, stream=True)
+                    print(response.status_code)
+                    response.raise_for_status()  # raise an exception in case of HTTP errors
 
-                # raise an exception in case of http errors
-                response.raise_for_status()
+                    date = filename.split('_')[8]
+                    date = date.split('T')[0]
 
-                date = filename.split('_')[8]
-                date = date.split('T')[0]
+                    path = os.path.join(folder, date)
+                    if not os.path.exists(path):
+                        os.mkdir(path)
 
-                path = os.path.join(folder, date)
-                if not os.path.exists(path):
-                    os.mkdir(path)
+                    # save the file
+                    with open(os.path.join(path, filename), 'wb') as fd:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            fd.write(chunk)
+                except requests.exceptions.HTTPError as e:
+                    # handle any errors here
+                    print(e)
 
-                # save the file
-                with open(os.path.join(path, filename), 'wb') as fd:
-
-                    for chunk in response.iter_content(chunk_size=1024 * 1024):
-                        fd.write(chunk)
-
-            except requests.exceptions.HTTPError as e:
-
-                # handle any errors here
-                print(e)
-
+    # Prepare for the next page
+    params['page_num'] += 1
